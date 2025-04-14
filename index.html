@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Phoneme Progression by Mean Age of Acquisition (Slider Version)</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <!-- Include our threshold data and category order -->
+  <script src="phonemeThresholds.js"></script>
+  <script src="phonemeOrderByCategory.js"></script>
+  
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 0;
+    }
+    #subtitle {
+      text-align: center;
+      font-size: 1.25em;
+      margin-top: 4px;
+      margin-bottom: 12px;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .controls button {
+      font-size: 1.1em;
+      padding: 8px 20px;
+      margin: 0 10px;
+    }
+    /* Responsive grid layout for the charts */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 10px;
+    }
+    .chart-group {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 4px;
+      margin: 4px 0;
+    }
+    .chart-title {
+      font-weight: bold;
+      margin-bottom: 2px;
+      font-size: 1.1em;
+      text-align: left;
+      padding-left: 1.5em;
+      text-indent: -1.5em;
+    }
+    .chart-box {
+      width: 100%;
+      height: 30vh;
+      overflow: hidden;
+    }
+    /* Style for the slider control */
+    #sliderContainer {
+      text-align: center;
+      margin: 20px;
+      display: none; /* hidden until the splash is dismissed */
+    }
+    #ageLabel {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      display: block;
+    }
+  </style>
+  
+  <script type="text/javascript">
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(initChart);
+
+    // Slider range: from 29.9 to 80.0 months (in 0.1 increments)
+    const minAge = 29.9;
+    const maxAge = 80.0;
+    
+    // Global variables for chart management.
+    let currentAge = minAge; // will be updated by slider movement
+    let chartMap = {};
+    let dataMap = {};
+
+    // Use the same category ordering as before.
+    const categories = {
+      chart_stops_chart: phonemeOrderByCategory.stops,
+      chart_fricatives_chart: phonemeOrderByCategory.fricatives,
+      chart_affricates_chart: phonemeOrderByCategory.affricates,
+      chart_nasals_chart: phonemeOrderByCategory.nasals,
+      chart_glides_chart: phonemeOrderByCategory.glides,
+      chart_liquids_chart: phonemeOrderByCategory.liquids
+    };
+
+    function initChart() {
+      drawIntro();
+    }
+
+    function drawIntro() {
+      document.getElementById("subtitle").innerText =
+        "This animated chart shows when children typically master different English consonant sounds. Click 'Next' to begin the slider-based animation.";
+      document.getElementById("grid").style.display = "none";
+    }
+
+    // Initialize charts with baseline values.
+    function initCharts() {
+      for (const [chartId, phonemeList] of Object.entries(categories)) {
+        let data = new google.visualization.DataTable();
+        data.addColumn('string', 'Phoneme');
+        data.addColumn('number', 'Mastery');
+        data.addColumn({ type: 'string', role: 'style' });
+        data.addColumn({ type: 'string', role: 'annotation' });
+        data.addColumn({ type: 'string', role: 'annotationText' });
+        
+        // Initialize with baseline values (we set mastery to 0 below threshold)
+        phonemeList.forEach(phoneme => {
+          // At baseline, we consider all phonemes as not yet reaching 50%.
+          data.addRow([phoneme, 0, `color: red`, phoneme, "<50%"]);
+        });
+        let chart = new google.visualization.BarChart(document.getElementById(chartId));
+        chart.draw(data, getChartOptions());
+        chartMap[chartId] = chart;
+        dataMap[chartId] = data;
+      }
+    }
+
+    // Interpolation function: given a phoneme and current age, compute mastery.
+    function getMastery(phoneme, age) {
+      let thresholds = phonemeThresholds[phoneme];
+      if (!thresholds) return { value: 0, annotation: "<50%" };
+
+      // Force monotonicity if necessary.
+      if (thresholds.t90 < thresholds.t75) {
+        thresholds.t90 = thresholds.t75;
+      }
+
+      if (age < thresholds.t50) {
+        // Below 50% threshold: display as "<50%"
+        return { value: 0.1, annotation: "<50%" };
+      } else if (age < thresholds.t75) {
+        let frac = (age - thresholds.t50) / (thresholds.t75 - thresholds.t50);
+        let mastery = 50 + frac * 25;
+        return { value: mastery, annotation: Math.round(mastery) + "%" };
+      } else if (age < thresholds.t90) {
+        let frac = (age - thresholds.t75) / (thresholds.t90 - thresholds.t75);
+        let mastery = 75 + frac * 15;
+        return { value: mastery, annotation: Math.round(mastery) + "%" };
+      } else {
+        return { value: 90, annotation: "90%" };
+      }
+    }
+
+    // Update charts based on the current slider value.
+    function updateCharts(age) {
+      currentAge = parseFloat(age);
+      document.getElementById("ageLabel").innerText =
+        "Age: " + currentAge.toFixed(1) + " months";
+      // Update each chart's data.
+      for (const [chartId, phonemeList] of Object.entries(categories)) {
+        let chart = chartMap[chartId];
+        let data = dataMap[chartId];
+        phonemeList.forEach((phoneme, index) => {
+          let res = getMastery(phoneme, currentAge);
+          data.setValue(index, 1, res.value);
+          data.setValue(index, 2, `color: ${getColor(res.value)}`);
+          data.setValue(index, 3, phoneme);
+          data.setValue(index, 4, res.annotation);
+        });
+        chart.draw(data, getChartOptions());
+      }
+    }
+
+    // Helper for bar color; the same thresholds as before.
+    function getColor(value) {
+      if (value >= 90) return 'green';
+      if (value >= 75) return 'yellow';
+      if (value >= 50) return 'orange';
+      return 'red';
+    }
+
+    function getChartOptions() {
+      return {
+        title: null,
+        hAxis: {
+          title: 'Phoneme Accuracy',
+          ticks: [
+            { v: 0, f: '0%' },
+            { v: 50, f: '50%' },
+            { v: 75, f: '75%' },
+            { v: 90, f: '90%' }
+          ],
+          minValue: 0,
+          maxValue: 100
+        },
+        vAxis: { direction: -1 },
+        legend: { position: 'none' },
+        animation: {
+          duration: 800,
+          easing: 'out'
+        }
+      };
+    }
+
+    // Called when the user clicks "Next" on the splash page.
+    function startSlider() {
+      document.getElementById("splashControls").style.display = "none";
+      document.getElementById("sliderContainer").style.display = "block";
+      document.getElementById("grid").style.display = "grid";
+      // Initialize the charts.
+      initCharts();
+      // Set initial slider position.
+      let slider = document.getElementById("ageSlider");
+      updateCharts(slider.value);
+    }
+
+    // Live update when window is resized.
+    window.addEventListener("resize", function() {
+      updateCharts(currentAge);
+    });
+  </script>
+</head>
+<body>
+  <h1>Phoneme Progression by Mean Age of Acquisition</h1>
+  <div id="subtitle">
+    This animated chart shows when children typically master different English consonant sounds.
+    Use the slider (in the next step) to view mastery at each month.
+  </div>
+
+  <!-- Splash controls: initially show a button to start the slider mode -->
+  <div class="controls" id="splashControls">
+    <div id="infobox" style="border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin: 10px auto 0; max-width: 700px; font-size: 0.95em; color: #333;">
+      <div><strong>Based on:</strong> Combined data from 15 studies of 18,907 children acquiring English in the United States</div>
+      <br>
+      <div>
+        <strong>Data source:</strong> Crowe, K., & McLeod, S. (2020).<br>
+        <i>Children's English consonant acquisition in the United States: A review.</i><br>
+        <i>American Journal of Speech-Language Pathology, 29</i>(4), 2155–2169.
+      </div>
+      <br>
+      <div>
+        <strong>Key:</strong>
+        <span style="color:red;">🔴</span> &lt;50% mastery &nbsp;
+        <span style="color:orange;">🟠</span> 50–74% mastery &nbsp;
+        <span style="color:yellow;">🟡</span> 75–89% mastery &nbsp;
+        <span style="color:green;">🟢</span> 90% mastery
+      </div>
+    </div>
+    <button onclick="startSlider()">Next ▶</button>
+  </div>
+  
+  <!-- Slider control -->
+  <div id="sliderContainer">
+    <span id="ageLabel">Age: -- months</span>
+    <input type="range" id="ageSlider" min="29.9" max="80.0" step="0.1" value="29.9"
+      oninput="updateCharts(this.value)">
+  </div>
+
+  <!-- Chart grid -->
+  <div id="grid" style="display:none;">
+    <div class="chart-group" id="chart_stops">
+      <div class="chart-title">Stops</div>
+      <div class="chart-box" id="chart_stops_chart"></div>
+    </div>
+    <div class="chart-group" id="chart_fricatives">
+      <div class="chart-title">Fricatives</div>
+      <div class="chart-box" id="chart_fricatives_chart"></div>
+    </div>
+    <div class="chart-group" id="chart_affricates">
+      <div class="chart-title">Affricates</div>
+      <div class="chart-box" id="chart_affricates_chart"></div>
+    </div>
+    <div class="chart-group" id="chart_nasals">
+      <div class="chart-title">Nasals</div>
+      <div class="chart-box" id="chart_nasals_chart"></div>
+    </div>
+    <div class="chart-group" id="chart_glides">
+      <div class="chart-title">Glides</div>
+      <div class="chart-box" id="chart_glides_chart"></div>
+    </div>
+    <div class="chart-group" id="chart_liquids">
+      <div class="chart-title">Liquids</div>
+      <div class="chart-box" id="chart_liquids_chart"></div>
+    </div>
+  </div>
+</body>
+</html>
