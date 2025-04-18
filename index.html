@@ -3,10 +3,8 @@
 <head>
   <title>Phoneme Progression by Mean Age of Acquisition (Slider Version)</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-  <!-- Include our threshold data and category order -->
   <script src="phonemeThresholds.js"></script>
   <script src="phonemeOrderByCategory.js"></script>
-  
   <style>
     body {
       font-family: sans-serif;
@@ -32,7 +30,6 @@
       padding: 8px 20px;
       margin: 0 10px;
     }
-    /* Responsive grid layout for the charts */
     #grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -57,11 +54,10 @@
       height: 30vh;
       overflow: hidden;
     }
-    /* Style for the slider control */
     #sliderContainer {
       text-align: center;
       margin: 20px;
-      display: none; /* hidden until the splash is dismissed */
+      display: none;
     }
     #ageLabel {
       font-size: 1.2em;
@@ -69,21 +65,16 @@
       display: block;
     }
   </style>
-  
   <script type="text/javascript">
     google.charts.load('current', { packages: ['corechart'] });
     google.charts.setOnLoadCallback(initChart);
 
-    // Slider range: from 29.9 to 80.0 months (in 0.1 increments)
     const minAge = 29.9;
     const maxAge = 80.0;
-    
-    // Global variables for chart management.
-    let currentAge = minAge; // will be updated by slider movement
+    let currentAge = minAge;
     let chartMap = {};
     let dataMap = {};
 
-    // Use the same category ordering as before.
     const categories = {
       chart_stops_chart: phonemeOrderByCategory.stops,
       chart_fricatives_chart: phonemeOrderByCategory.fricatives,
@@ -103,7 +94,6 @@
       document.getElementById("grid").style.display = "none";
     }
 
-    // Initialize charts with baseline values.
     function initCharts() {
       for (const [chartId, phonemeList] of Object.entries(categories)) {
         let data = new google.visualization.DataTable();
@@ -112,10 +102,8 @@
         data.addColumn({ type: 'string', role: 'style' });
         data.addColumn({ type: 'string', role: 'annotation' });
         data.addColumn({ type: 'string', role: 'annotationText' });
-        
-        // Initialize with baseline values (we set mastery to 0 below threshold)
+
         phonemeList.forEach(phoneme => {
-          // At baseline, we consider all phonemes as not yet reaching 50%.
           data.addRow([phoneme, 0, `color: red`, phoneme, "<50%"]);
         });
         let chart = new google.visualization.BarChart(document.getElementById(chartId));
@@ -125,18 +113,15 @@
       }
     }
 
-    // Interpolation function: given a phoneme and current age, compute mastery.
     function getMastery(phoneme, age) {
       let thresholds = phonemeThresholds[phoneme];
       if (!thresholds) return { value: 0, annotation: "<50%" };
 
-      // Force monotonicity if necessary.
       if (thresholds.t90 < thresholds.t75) {
         thresholds.t90 = thresholds.t75;
       }
 
       if (age < thresholds.t50) {
-        // Below 50% threshold: display as "<50%"
         return { value: 0.1, annotation: "<50%" };
       } else if (age < thresholds.t75) {
         let frac = (age - thresholds.t50) / (thresholds.t75 - thresholds.t50);
@@ -151,12 +136,13 @@
       }
     }
 
-    // Update charts based on the current slider value.
     function updateCharts(age) {
       currentAge = parseFloat(age);
+      let years = Math.floor(currentAge / 12);
+      let months = Math.round(currentAge % 12);
       document.getElementById("ageLabel").innerText =
-        "Age: " + currentAge.toFixed(1) + " months";
-      // Update each chart's data.
+        `Age: ${currentAge.toFixed(1)} months (${years} years, ${months} months)`;
+
       for (const [chartId, phonemeList] of Object.entries(categories)) {
         let chart = chartMap[chartId];
         let data = dataMap[chartId];
@@ -171,7 +157,6 @@
       }
     }
 
-    // Helper for bar color; the same thresholds as before.
     function getColor(value) {
       if (value >= 90) return 'green';
       if (value >= 75) return 'yellow';
@@ -202,19 +187,16 @@
       };
     }
 
-    // Called when the user clicks "Next" on the splash page.
     function startSlider() {
+      document.getElementById("subtitle").innerText = "Use the slider to view mastery at each month.";
       document.getElementById("splashControls").style.display = "none";
       document.getElementById("sliderContainer").style.display = "block";
       document.getElementById("grid").style.display = "grid";
-      // Initialize the charts.
       initCharts();
-      // Set initial slider position.
       let slider = document.getElementById("ageSlider");
       updateCharts(slider.value);
     }
 
-    // Live update when window is resized.
     window.addEventListener("resize", function() {
       updateCharts(currentAge);
     });
@@ -226,46 +208,37 @@
     This animated chart shows when children typically master different English consonant sounds.
     Use the slider (in the next step) to view mastery at each month.
   </div>
-  
-  <!-- Key and citations -->
-<div id="infobox" style="border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin: 10px auto 0; max-width: 700px; font-size: 0.95em; color: #333;">
-      <div><strong>Based on:</strong> Combined data from 15 studies of 18,907 children acquiring English in the United States</div>
-      <br>
-       <div>
-        <strong>Data source:</strong> <br> Crowe, K., & McLeod, S. (2020).<br>
-        Children's English consonant acquisition in the United States: A review.<br>
-        <i>American Journal of Speech-Language Pathology, 29</i>(4), 2155–2169.<br>
-        <a href="https://doi.org/10.1044/2020_AJSLP-19-00168" target="_blank">
-          https://doi.org/10.1044/2020_AJSLP-19-00168
-        </a>
-      </div>
-      <div style="margin-top: 0.5em;">
-        <strong>Visualization by</strong> <br>Imran Musaji, <em>PhD CCC-SLP, Wichita State University</em>
-      </div>
-      <br>
-      <div>
-        <strong>Key:</strong>
-        <span style="color:red;">🔴</span> Not yet acquired &nbsp;
-        <span style="color:orange;">🟠</span> 50% of children &nbsp;
-        <span style="color:yellow;">🟡</span> 75% of children &nbsp;
-        <span style="color:green;">🟢</span> 90% of children
-      </div>
+  <div id="infobox" style="border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin: 10px auto 0; max-width: 700px; font-size: 0.95em; color: #333;">
+    <div><strong>Based on:</strong> Combined data from 15 studies of 18,907 children acquiring English in the United States</div>
+    <br>
+    <div>
+      <strong>Data source:</strong> <br> Crowe, K., & McLeod, S. (2020).<br>
+      Children's English consonant acquisition in the United States: A review.<br>
+      <i>American Journal of Speech-Language Pathology, 29</i>(4), 2155–2169.<br>
+      <a href="https://doi.org/10.1044/2020_AJSLP-19-00168" target="_blank">
+        https://doi.org/10.1044/2020_AJSLP-19-00168
+      </a>
     </div>
-  
-  <!-- Splash controls: initially show a button to start the slider mode -->
+    <div style="margin-top: 0.5em;">
+      <strong>Visualization by</strong> <br>Imran Musaji, <em>PhD CCC-SLP, Wichita State University</em>
+    </div>
+    <br>
+    <div>
+      <strong>Key:</strong>
+      <span style="color:red;">🔴</span> Not yet acquired &nbsp;
+      <span style="color:orange;">🟠</span> 50% of children &nbsp;
+      <span style="color:yellow;">🟡</span> 75% of children &nbsp;
+      <span style="color:green;">🟢</span> 90% of children
+    </div>
+  </div>
   <div class="controls" id="splashControls">
-    
     <button onclick="startSlider()">Next ▶</button>
   </div>
-  
-  <!-- Slider control -->
   <div id="sliderContainer">
     <span id="ageLabel">Age: -- months</span>
     <input type="range" id="ageSlider" min="29.9" max="80.0" step="0.1" value="29.9"
       oninput="updateCharts(this.value)">
   </div>
-
-  <!-- Chart grid -->
   <div id="grid" style="display:none;">
     <div class="chart-group" id="chart_stops">
       <div class="chart-title">Stops</div>
